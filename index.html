@@ -110,7 +110,7 @@ function create ()
 			this.alive = true;
             this.heading = RIGHT;
             this.direction = RIGHT;
-			this.speed = 20;
+			this.speed = 100;
             this.moveTime = 0;
         },
 		
@@ -224,9 +224,9 @@ function create ()
             if (this.head.x === food.x && this.head.y === food.y)
             {
                 this.grow(); //lisäosa käärmeelle
-                food.eat(); // ruuan syönti ja uuden lisäys
+                food.eat(); // ruuan syönti
 
-                //  Käärme hidastuu sen kasvaessa
+                //  Käärmen nopeus kasvaa sen syödessä
                 if (this.speed > 20 && food.total % 5 === 0)
                 {
                     this.speed -= 2;
