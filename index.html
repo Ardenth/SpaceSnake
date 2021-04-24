@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.15.1/dist/phaser-arcade-physics.min.js"></script>
+</head>
+<body>
+
+    <script>
+	
+/**
+ *@author Riku Lehkonen
+ *@assets Nicole Bauer (snake)
+ *@created 24.04.2021
+ * Käärme peli
+ * Käärmeen grafiikat: Nicole Bauer
+ */
+var config = {
+    type: Phaser.WEBGL,
+    width: 640,
+    height: 480,
+    backgroundColor: '#bfcc00',
+    parent: 'phaser-example',
+    scene: {
+        preload: preload,
+        create: create,
+        update: update
+    }
+};
+
+var snake;
+var food;
+var cursors;
+var scoreText;
+
+// Suunta consts
+var UP = 0;
+var DOWN = 1;
+var LEFT = 2;
+var RIGHT = 3;
+
+var game = new Phaser.Game(config);
+
+/*
+* Asset preload
+* Snake assets by Nicole Bauer (snej)
+*/
+function preload ()
+{
+    this.load.image('food', 'assets/Food.png');
+    this.load.image('body', 'assets/Rectangle.png');
+	this.load.image('head_right', 'assets/snej1_right.png');
+	this.load.image('head_left', 'assets/snej1_left.png');
+	this.load.image('head_down', 'assets/snej1_down.png');
+	this.load.image('head_up', 'assets/snej1_up.png');
+    this.load.image('body2', 'assets/snej2.png');
+	this.load.audio('eat', 'assets/effects/Eat.wav');
+	this.load.audio('explosion', 'assets/effects/Explosion.wav')
+	this.load.image('background', 'assets/Background.jpg');
+}
+
+/*
+* Pelin luonti, background, Käärme, Ruoka
+*/
+function create ()
+{
+	// Ruuan luokka
+    var Food = new Phaser.Class({
+
+        Extends: Phaser.GameObjects.Image,
+		
+        initialize:
+
+        function Food (scene, x, y)
+        {
+            Phaser.GameObjects.Image.call(this, scene)
+			this.setPosition(x * 16, y * 16);
+            this.setTexture('food');
+			this.total = 0;
+            this.setOrigin(0);
+            scene.children.add(this);
+        },
+
+        eat: function ()
+        {
+			this.scene.sound.play('eat');
+            this.total++;
+			scoreText.setText('Score: ' + this.total);
+        }
+
+    });
+
+	/*
+	* Käärmeen luokka
+	* Assets by Nicole Bauer.
+	*/
+    var Snake = new Phaser.Class({
+
+        initialize:
+		
+		/*
+		Prefab käärmeelle
+		*/
+        function Snake (scene, x, y)
+        {
+            this.headPosition = new Phaser.Geom.Point(x, y);
+            this.body = scene.add.group();
+			this.head = this.body.create(x * 16, y * 16, 'head_right');
+            this.head.setOrigin(0);
+            this.tail = new Phaser.Geom.Point(x, y); // Hännän seuranta lisäosia varten
+			this.alive = true;
+            this.heading = RIGHT;
+            this.direction = RIGHT;
+			this.speed = 80;
+            this.moveTime = 0;
+        },
+		
+        update: function (time)
+        {
+            if (time >= this.moveTime)
+            {
+                return this.move(time);
+            }
+        },
+
+		/*
+		Käärmeen pään kääntyminen, vaikuttaa mikä png käytössä.
+		*/
+        faceLeft: function ()
+        {
+            if (this.direction === UP || this.direction === DOWN)
+            {
+                this.heading = LEFT;
+				this.head.setTexture('head_left');
+            }
+        },
+
+        faceRight: function ()
+        {
+            if (this.direction === UP || this.direction === DOWN)
+            {
+                this.heading = RIGHT;
+				this.head.setTexture('head_right');
+            }
+        },
+
+        faceUp: function ()
+        {
+            if (this.direction === LEFT || this.direction === RIGHT)
+            {
+                this.heading = UP;
+				this.head.setTexture('head_up');
+            }
+        },
+
+        faceDown: function ()
+        {
+            if (this.direction === LEFT || this.direction === RIGHT)
+            {
+                this.heading = DOWN;
+				this.head.setTexture('head_down');
+            }
+        },
+
+        move: function (time)
+        {
+            /*
+            * Pään suunta (heading) vaikuttaa pään sijainnin arvoon.
+            * Math.wrap mahdollistaa pelialueen toiselle puolelle ilmestymisen.
+			* Pelin grid on [40,30] = [640/16, 480/16]
+            */
+            switch (this.heading)
+            {
+                case LEFT:
+                    this.headPosition.x = Phaser.Math.Wrap(this.headPosition.x - 1, 0, 40);
+                    break;
+
+                case RIGHT:
+                    this.headPosition.x = Phaser.Math.Wrap(this.headPosition.x + 1, 0, 40);
+                    break;
+
+                case UP:
+                    this.headPosition.y = Phaser.Math.Wrap(this.headPosition.y - 1, 0, 30);
+                    break;
+
+                case DOWN:
+                    this.headPosition.y = Phaser.Math.Wrap(this.headPosition.y + 1, 0, 30);
+                    break;
+            }
+			
+			// Direction muutos headingin mukaan, vaikuttaa miten heading tarkistetaan.
+            this.direction = this.heading;
+
+            // Käärmeen kehon päivitys, siirretään hännän paikkaa samalla.
+            Phaser.Actions.ShiftPosition(this.body.getChildren(), this.headPosition.x * 16, this.headPosition.y * 16, 1, this.tail);
+
+			// Kehon ja pään päällekkäisyyden tarkistus; collision detection.
+            var hitBody = Phaser.Actions.GetFirst(this.body.getChildren(), { x: this.head.x, y: this.head.y }, 1);
+			
+			// Collision aikaisemman tarkistuksen mukaan.
+            if (hitBody)
+            {
+                console.log('dead');
+                this.alive = false;
+                return false;
+            }
+            else
+            {
+                // !Collision, eli peli jatkuu.
+                this.moveTime = time + this.speed;
+                return true;
+            }
+        },
+		
+		// Kasvu -funktio. Lisätään ruumiinosa käärmeen häntään.
+        grow: function ()
+        {
+            var newBody = this.body.create(this.tail.x, this.tail.y, 'body2');
+            newBody.setOrigin(0);
+        },
+
+		// Ruuan collision tarkistus.
+        collideWithFood: function (food)
+        {
+            if (this.head.x === food.x && this.head.y === food.y)
+            {
+                this.grow(); //lisäosa käärmeelle
+                food.eat(); // ruuan syönti ja uuden lisäys
+
+                //  Käärme hidastuu sen kasvaessa
+                if (this.speed > 20 && food.total % 5 === 0)
+                {
+                    this.speed -= 2;
+                }
+
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        },
+		
+		// Mahdollisten ruokien paikat.
+        updateGrid: function (grid)
+        {
+            // Estetään ruuan ilmestyminen käärmeen päälle.
+            this.body.children.each(function (segment) {
+
+                var bx = segment.x / 16;
+                var by = segment.y / 16;
+                grid[by][bx] = false;
+
+            });
+
+            return grid;
+        }
+
+    });
+
+	this.add.image(0, 0, 'background'); // Pelin background.
+    food = new Food(this, 3, 4); // Aloituksen ruoan paikka.
+    snake = new Snake(this, 9, 9); // Käärmeen aloituspaikka.
+	scoreText = this.add.text(240, 16, 'Score: 0', { fontSize: '32px', fill: '#FFF' });
+
+    // Näppäimistön seuranta.
+    cursors = this.input.keyboard.createCursorKeys();
+}
+
+// Pelin tilan seuranta
+function update (time, delta)
+{
+	// Peli loppuu jos käärme kuolee
+    if (!snake.alive)
+    {
+		this.scene.sound.play('explosion');
+        return;
+    }
+
+	/*
+	* Näppäimistön painalluksen seuranta.
+	* Estää päinvastaisen liikeen, joka on kiellettyä alkuperäisessä pelissä.
+	* esim. oikealle => alas/ylös, ei vasemmalle.
+	*/
+    if (cursors.left.isDown)
+    {
+        snake.faceLeft();
+    }
+    else if (cursors.right.isDown)
+    {
+        snake.faceRight();
+    }
+    else if (cursors.up.isDown)
+    {
+        snake.faceUp();
+    }
+    else if (cursors.down.isDown)
+    {
+        snake.faceDown();
+    }
+
+	// Käärmeen tilan (elossaolon) seuranta
+    if (snake.update(time))
+    {
+        if (snake.collideWithFood(food))
+        {
+            repositionFood();
+        }
+    }
+}
+
+/*
+* Ruokaa voi lisätä ainoastaan tyhjille ruuduille. Funktio sen varmistamiseksi
+*/
+function repositionFood ()
+{
+    // True grid pelikentästä
+    var testGrid = [];
+
+    for (var y = 0; y < 30; y++)
+    {
+        testGrid[y] = [];
+
+        for (var x = 0; x < 40; x++)
+        {
+            testGrid[y][x] = true;
+        }
+    }
+
+	// Päivitetään grid käärmeen paikalla.
+    snake.updateGrid(testGrid);
+
+    // Uusi grid, joka sallii ainoastaan oikeelliset paikat (käärmeen paikat pois).
+    var validLocations = [];
+
+    for (var y = 0; y < 30; y++)
+    {
+        for (var x = 0; x < 40; x++)
+        {
+            if (testGrid[y][x] === true)
+            {
+                // Oikeellisen paikan lisäys uuteen gridiin.
+                validLocations.push({ x: x, y: y });
+            }
+        }
+    }
+
+	// Jos käärme ei täytä koko pelikenttää, randomgen sen paikka ja lisää.
+    if (validLocations.length > 0)
+    {
+        var pos = Phaser.Math.RND.pick(validLocations);
+        food.setPosition(pos.x * 16, pos.y * 16);
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+    </script>
+
+</body>
+</html>
