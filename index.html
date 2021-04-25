@@ -29,7 +29,7 @@ var config = {
 
 var snake;
 var food;
-var cursors;
+var keypresses;
 var scoreText;
 
 // Suunta consts
@@ -75,7 +75,7 @@ function create ()
 			Phaser.GameObjects.Image.call(this, scene)
 			this.setPosition(x * 16, y * 16);
 			this.setTexture('food');
-			this.total = 0;
+			this.totalFood = 0;
 			this.setOrigin(0);
 			scene.children.add(this);
 		},
@@ -83,8 +83,8 @@ function create ()
 		eat: function ()
 		{
 			this.scene.sound.play('eat');
-			this.total++;
-			scoreText.setText('Score: ' + this.total);
+			this.totalFood++;
+			scoreText.setText('Score: ' + this.totalFood);
 		}
 
 	});
@@ -108,12 +108,12 @@ function create ()
 			this.head.setOrigin(0);
 			this.tail = new Phaser.Geom.Point(x, y); // Hännän seuranta lisäosia varten
 			this.alive = true;
-			this.heading = RIGHT;
+			this.headDirection = RIGHT;
 			this.direction = RIGHT;
 			this.speed = 100;
 			this.moveTime = 0;
 		},
-		
+		//time based update
 		update: function (time)
 		{
 			if (time >= this.moveTime)
@@ -129,7 +129,7 @@ function create ()
 		{
 			if (this.direction === UP || this.direction === DOWN)
 			{
-				this.heading = LEFT;
+				this.headDirection = LEFT;
 				this.head.setTexture('head_left');
 			}
 		},
@@ -138,7 +138,7 @@ function create ()
 		{
 			if (this.direction === UP || this.direction === DOWN)
 			{
-				this.heading = RIGHT;
+				this.headDirection = RIGHT;
 				this.head.setTexture('head_right');
 			}
 		},
@@ -147,7 +147,7 @@ function create ()
 		{
 			if (this.direction === LEFT || this.direction === RIGHT)
 			{
-				this.heading = UP;
+				this.headDirection = UP;
 				this.head.setTexture('head_up');
 			}
 		},
@@ -156,7 +156,7 @@ function create ()
 		{
 			if (this.direction === LEFT || this.direction === RIGHT)
 			{
-				this.heading = DOWN;
+				this.headDirection = DOWN;
 				this.head.setTexture('head_down');
 			}
 		},
@@ -164,11 +164,11 @@ function create ()
 		move: function (time)
 		{
 			/*
-			* Pään suunta (heading) vaikuttaa pään sijainnin arvoon.
+			* Pään suunta (headDirection) vaikuttaa pään sijainnin arvoon.
 			* Math.wrap mahdollistaa pelialueen toiselle puolelle ilmestymisen.
 			* Pelin grid on [40,30] = [640/16, 480/16]
 			*/
-			switch (this.heading)
+			switch (this.headDirection)
 			{
 				case LEFT:
 					this.headPosition.x = Phaser.Math.Wrap(this.headPosition.x - 1, 0, 40);
@@ -187,8 +187,8 @@ function create ()
 					break;
 			}
 			
-			// Direction muutos headingin mukaan, vaikuttaa miten heading tarkistetaan.
-			this.direction = this.heading;
+			// Direction muutos headDirectionin mukaan, vaikuttaa miten headDirection tarkistetaan.
+			this.direction = this.headDirection;
 
 			// Käärmeen kehon päivitys, siirretään hännän paikkaa samalla.
 			Phaser.Actions.ShiftPosition(this.body.getChildren(), this.headPosition.x * 16, this.headPosition.y * 16, 1, this.tail);
@@ -227,7 +227,7 @@ function create ()
 				food.eat(); // ruuan syönti
 
 				//  Käärmen nopeus kasvaa sen syödessä
-				if (this.speed > 20 && food.total % 5 === 0)
+				if (this.speed > 20 && food.totalFood % 5 === 0)
 				{
 					this.speed -= 2;
 				}
@@ -263,7 +263,7 @@ function create ()
 	scoreText = this.add.text(240, 16, 'Score: 0', { fontSize: '32px', fill: '#FFF' });
 
 	// Näppäimistön seuranta.
-	cursors = this.input.keyboard.createCursorKeys();
+	keypresses = this.input.keyboard.createCursorKeys();
 }
 
 // Pelin tilan seuranta
@@ -281,19 +281,19 @@ function update (time, delta)
 	* Estää päinvastaisen liikeen, joka on kiellettyä alkuperäisessä pelissä.
 	* esim. oikealle => alas/ylös, ei vasemmalle.
 	*/
-	if (cursors.left.isDown)
+	if (keypresses.left.isDown)
 	{
 		snake.faceLeft();
 	}
-	else if (cursors.right.isDown)
+	else if (keypresses.right.isDown)
 	{
 		snake.faceRight();
 	}
-	else if (cursors.up.isDown)
+	else if (keypresses.up.isDown)
 	{
 		snake.faceUp();
 	}
-	else if (cursors.down.isDown)
+	else if (keypresses.down.isDown)
 	{
 		snake.faceDown();
 	}
